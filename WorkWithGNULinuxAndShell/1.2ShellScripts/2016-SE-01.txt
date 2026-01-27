@@ -1,0 +1,16 @@
+Зад. 17 2016-SE-01 Напишете shell скрипт, който по подаден един позиционен параметър, ако този параметър
+е директория, намира всички symlink-ове в нея и под-директориите ѝ с несъществуващ destination.
+
+
+1 #!/bin/bash
+2
+3 [[ "$#" -ne 1 ]] && echo "Invalid args" >&2 && exit 1
+4
+5 if [[ -d "$1" ]]; then
+6     find "$1" -type l !  -exec test -e {} \; -print
+7 else
+8     echo "$1 is not dir!" >&2
+9     exit 1
+10 fi
+11
+12 exit 0
