@@ -1,0 +1,56 @@
+Зад. 18 2016-SE-02 Напишете shell скрипт, който приема един позиционен параметър - число. Ако скриптът
+се изпълнява като root, да извежда обобщена информация за общото количество активна памет (RSS
+- resident set size, non-swapped physical memory that a task has used) на процесите на всеки потребител.
+Ако за някой потребител обобщеното число надвишава подадения параметър, да изпраща подходящи
+сигнали за прекратяване на процеса с най-много активна памет на потребителя.
+Забележка: Приемаме, че изхода в колоната RSS е число в същата мерна единица, като числото, подадено като аргумент. Примерен формат:
+5
+USER PID %CPU %MEM VSZ RSS TTY STAT START TIME COMMAND
+root 1 0.0 0.0 15816 1884 ? Ss May12 0:03 init [2]
+root 2 0.0 0.0 0 0 ? S May12 0:00 [kthreadd]
+root 3 0.0 0.0 0 0 ? S May12 0:02 [ksoftirqd/0]
+Забележка: Алтернативно може да ползвате изхода от ps -e -o uid,pid,rss
+
+
+
+  1 #!/bin/bash
+  2
+  3 [[ "$#" -ne 1 ]] && echo "Invalid argument count. Must be one!">&2 && exit 1
+  4
+  5
+  6 [[ ! "$1" =~ ^[0-9]+$ ]] && echo "Argument must be number!">&2 && exit 2
+  7
+  8 LIMIT=$1
+  9
+ 10 #dali sme v root
+ 11 [[ $EUID -ne 0 ]] && echo "Script must be run as root!">&2 && exit 3
+ 12
+ 13 ps -e -o uid,pid,rss | tail -n +2 |
+ 14 awk -F' ' -v limit="$LIMIT" '
+ 15 {
+ 16     user=$1
+ 17     pid=$2
+ 18     rss=$3
+ 19
+ 20     sum[user] += rss
+ 21
+ 22     if (rss > max_rss[user]) {
+ 23         max_rss[user] = rss
+ 24         max_pid[user] = pid
+ 25     }
+ 26
+ 27 }
+ 28 END {
+ 29     for (u in sum) {
+ 30         if (sum[u] > limit) {
+ 31         print u, sum[u], max_pid[u]
+ 32         }
+ 33     }
+ 34 }' |
+ 35 while read user total pid; do
+ 36     echo "User $user uses $total RSS, killing PID $pid"
+ 37     kill -TERM "$pid"
+ 38 done
+ 39
+ 40 exit 0
+~
