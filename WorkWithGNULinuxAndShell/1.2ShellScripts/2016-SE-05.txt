@@ -1,0 +1,55 @@
+Зад. 21 2016-SE-05 Файловете във вашата home директория съдържат информация за музикални албуми и
+имат специфична структура. Началото на всеки ред е годината на издаване на албума, а непосредствено, след началото на всеки ред следва името на изпълителя на песента.
+Имената на файловете се
+състоят от една дума, която съвпада с името на изпълнителя.
+Примерно съдържание на файл с име ”Bonnie”:
+2005г. Bonnie - "God Was in the Water" (Randall Bramblett, Davis Causey) – 5:17
+2005г. Bonnie - "Love on One Condition" (Jon Cleary) – 3:43
+2005г. Bonnie - "So Close" (Tony Arata, George Marinelli, Pete Wasner) – 3:22
+2005г. Bonnie - "Trinkets" (Emory Joseph) – 5:02
+2005г. Bonnie - "Crooked Crown" (David Batteau, Maia Sharp) – 3:49
+2005г. Bonnie - "Unnecessarily Mercenary" (Jon Cleary) – 3:51
+2005г. Bonnie - "I Will Not Be Broken" - "Deep Water" (John Capek, Marc Jordan) – 3:58
+Да се напише shell скрипт приемащ два параметъра, които са имена на файлове от вашата home директория. Скриптът сравнява, кой от двата файла има повече на брой редове, 
+съдържащи неговото
+име (на файла). За файлът победител изпълнете следните действия:
+• извлечете съдържанието му, без годината на издаване на албума и без името на изпълнителя
+• сортирайте лексикографски извлеченото съдържание и го запишете във файл с име ’изпълнител.songs’
+Примерен изходен файл (с име Bonnie.songs):
+"Crooked Crown" (David Batteau, Maia Sharp) – 3:49
+"God Was in the Water" (Randall Bramblett, Davis Causey) – 5:17
+"I Will Not Be Broken" - "Deep Water" (John Capek, Marc Jordan) – 3:58
+"Love on One Condition" (Jon Cleary) – 3:43
+"So Close" (Tony Arata, George Marinelli, Pete Wasner) – 3:22
+"Trinkets" (Emory Joseph) – 5:02
+"Unnecessarily Mercenary" (Jon Cleary) – 3:51
+
+
+ 
+  1 #!/bin/bash
+  2
+  3 [[ "$#" -ne 2 ]] && echo "Invalid cnt args. Must be 2" >&2 && exit 1
+  4
+  5 [[ ! -e "$1" ]] && echo "$1 file does not exist!" >&2 && exit 2
+  6
+  7 [[ ! -e "$2" ]] && echo "$2 file does not exist!" >&2 && exit 3
+  8
+  9 file1_name=$(echo "$1" | cut -d'.' -f1)
+ 10 file2_name=$(echo "$2" | cut -d'.' -f1)
+ 11
+ 12 len1=$(grep -o "$file1_name" "$1" | wc -l)
+ 13 len2=$(grep -o "$file2_name" "$2" | wc -l)
+ 14
+ 15 if [[ "$len1" -ge "$len2" ]]; then
+ 16     winner="$1"
+ 17 else
+ 18     winner="$2"
+ 19 fi
+ 20
+ 21 artist=$(echo "$winner" | cut -d'.' -f1) #vzimame imeto
+ 22 touch "$artist.songs" #syzdavame faila
+ 23
+ 24 cut -d' ' -f4- "$winner"| sort -k1 > "$artist.songs"
+ 25
+ 26 exit 0
+
