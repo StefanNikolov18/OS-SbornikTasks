@@ -1,0 +1,21 @@
+Зад. 19 2016-SE-03 Напишете shell скрипт който, ако се изпълнява от root, проверява кои потребители на
+системата нямат homedir или не могат да пишат в него.
+Примерен формат:
+root:x:0:0:root:/root:/bin/bash
+daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin
+bin:x:2:2:bin:/bin:/usr/sbin/nologin
+
+
+1 #!/bin/bash
+  2
+  3
+  4 [[ "${EUID}" -ne 0 ]] && echo "Is not from root">&2 && exit 1
+  5
+  6 while IFS=: read -r user pass uid gid desc home shell; do
+  7     if [[ ! -d "$home" || ! -w "$home" ]]; then
+  8         echo "$user:$home"
+  9     fi
+ 10 done < /etc/passwd
+ 11
+ 12
+ 13 exit 0
