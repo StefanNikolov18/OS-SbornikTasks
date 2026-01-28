@@ -14,7 +14,7 @@
   7 allNewwest=$(while IFS=':' read -r user _ _ _ _ home _;do
   8     [[ -d "$home" ]] || continue
   9
- 10     newwer=$(find "$home" -xdev -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr -k1 | head -
+ 10     newwer=$(find "$home" -xdev -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr -k1 | head -n 1
  11     [[ ! -z "$newwer" ]] && echo "$newwer $user"
  12 done < /etc/passwd
  13 )
