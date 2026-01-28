@@ -1,0 +1,70 @@
+Зад. 24 2017-IN-02 Напишете скрипт, който приема задължителен позиционен аргумент - име на потребител
+FOO. Ако скриптът се изпълнява от root:
+а) да извежда имената на потребителите, които имат повече на брой процеси от FOO, ако има такива;
+б) да извежда средното време (в секунди), за което са работили процесите на всички потребители
+на системата (TIME, във формат HH:MM:SS);
+в) ако съществуват процеси на FOO, които са работили над два пъти повече от средното време,
+скриптът да прекратява изпълнението им по подходящ начин.
+За справка:
+$ ps -e -o user,pid,%cpu,%mem,vsz,rss,tty,stat,time,command | head -5
+USER PID %CPU %MEM VSZ RSS TT STAT TIME COMMAND
+root 1 0.0 0.0 15820 1920 ? Ss 00:00:05 init [2]
+root 2 0.0 0.0 0 0 ? S 00:00:00 [kthreadd]
+root 3 0.0 0.0 0 0 ? S 00:00:01 [ksoftirqd/0]
+root 5 0.0 0.0 0 0 ? S< 00:00:00 [kworker/0:0H]
+
+1 #!/bin/bash
+  2
+  3 [[ "$#" -ne 1 ]] && echo "Invalid args cnt! Must be one for the user!">&2 && exit 1
+  4 [[ "$EUID" -ne 0 ]] && echo "Bash script $0 is not from root!">&2 && exit 2
+  5
+  6 cntPSFoo=0
+  7 while read -r user pid cpu mem vsz rss tty stat time comm; do
+  8     if [[ "$user" == "$1" ]]; then
+  9         ((cntPSFoo++))
+ 10     fi
+ 11 done < <(ps -eo user,pid,cpu,mem,vsz,rss,tty,stat,time,comm)
+ 12
+ 13 #a
+ 14 while read -r cnt user; do
+ 15     if [[ "$cnt" -gt "$cntPSFoo" ]]; then
+ 16         echo "$user"
+ 17     fi
+ 18 done < <(ps -eo user= | sort | uniq -c)
+ 19
+ 20 #b
+ 21 cntAllPS=0
+ 22 secondsAll=0
+ 23 while read -r user pid cpu mem vsz rss tty stat time comm; do
+ 24     seconds=$(echo "$time" | awk -F':' '{print $1*3600 + $2*60 + $3}')
+ 25     ((secondsAll+="$seconds"))
+ 26     ((cntAllPS++))
+ 27 done < <(ps -eo user,pid,cpu,mem,vsz,rss,tty,stat,time,comm)
+ 28
+ 29 if [[ "$cntAllPS" -eq 0 ]]; then
+ 30     averageT=0
+ 31 else
+ 32     averageT=$((secondsAll/cntAllPS))
+ 33 fi
+ 34
+ 35 echo "Average time of all processes is: $averageT"
+ 36
+ 37 #c
+ 38 allProcesesFOO=$(
+ 39     while read -r user pid cpu mem vsz rss tty stat time comm; do
+ 40         if [[ "$user" == "$1" ]]; then
+ 41             second=$(echo "$time" | awk -F':' '{print $1*3600 + $2*60 + $3}')
+ 42             echo "$pid $user $second"
+ 43         fi
+ 44     done < <(ps -eo user,pid,cpu,mem,vsz,rss,tty,stat,time,comm))
+ 45
+ 46
+ 47 while read -r pid user time; do
+ 48     overTime=$((2*time))
+ 49     if [[ "$overTime" -gt "$averageT" ]]; then
+ 50         echo "Killing $pid peacefully!"
+ 51         kill -s 15 "$pid"
+ 52     fi
+ 53 done <<< "$allProcesesFOO"
+ 54
+
