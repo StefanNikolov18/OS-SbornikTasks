@@ -1,0 +1,63 @@
+Зад. 43 2020-SE-06 Под конфигурационен файл ще разбираме файл, в който има редове от вида key=value,
+където key и value могат да се състоят от букви, цифри и знак “долна черта” (“_”). Освен това, във
+файла може да има празни редове; може да има произволен whitespace в началото и в края на редовете,
+както и около символа “=”. Също така са допустими и коментари в даден ред: всичко след символ “#”
+се приема за коментар.
+Под <date> ще разбираме текущото време, върнато от командата date без параметри; под <user> ще
+разбираме името на текущият потребител.
+Напишете shell скрипт set_value.sh, който приема 3 позиционни аргумента – име на конфигурационен файл, ключ (foo) и стойност (bar). Ако ключът:
+• присъства във файла с друга стойност, скриптът трябва да:
+– да закоментира този ред като сложи # в началото на реда и добави в края на реда # edited
+at <date> by <user>
+– да добави нов ред foo = bar # added at <date> by <user> точно след стария ред
+• не присъства във файла, скриптът трябва да добави ред от вида foo = bar # added at <date>
+by <user> на края на файла
+Примерен foo.conf:
+# route description
+from = Sofia
+to = Varna # my favourite city!
+type = t2_1
+Примерно извикване:
+./set_value.sh foo.conf to Plovdiv
+Съдържание на foo.conf след извикването:
+# route description
+from = Sofia
+# to = Varna # my favourite city! # edited at Tue Aug 25 15:48:29 EEST 2020 by human
+to = Plovdiv # added at Tue Aug 25 15:48:29 EEST 2020 by human
+type = t2_1
+
+
+  1 #!/bin/bash
+  2
+  3 [[ "$#" -ne 3 ]] && echo "Ivalid args cnt. Must be 3!" >&2 && exit 1
+  4
+  5 [[ ! -e "$1" ]] && echo "File $1 does not exist!" >&2 && exit 2
+  6
+  7 file="$1"
+  8 mkey="$2"
+  9 mval="$3"
+ 10
+ 11
+ 12 touch temp.txt #vremenen file
+ 13 isThere=0 #0-false 1-true
+ 14 while IFS='=' read -r key val; do
+ 15     k=$(echo "$key" | grep -oE '[a-zA-Z0-9_]+')
+ 16     if [[ "$k" == "$mkey" ]]; then
+ 17         ((isThere++))
+ 18         echo "# $key = $val # edited at $(date) by $(whoami)" >> temp.txt
+ 19         echo " $k = $mval # added at $(date) by $(whoami)" >> temp.txt
+ 20     else
+ 21         echo "$key = $val" >> temp.txt
+ 22     fi
+ 23
+ 24 done < "$file"
+ 25
+ 26 [[ "$isThere" -eq 0 ]] && echo "$mkey = $mval #added at $(date) by $(whoami)" >> temp.txt
+ 27
+ 28 cat temp.txt > "$file"
+ 29 rm temp.txt
+ 30
+ 31 exit 0
+ 32
+
+
