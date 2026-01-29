@@ -22,6 +22,7 @@ VALUE
 oracle@astero:~$
 Параметърът diagnostic_dest може да няма стойност, в който случай изведеният низ ще е празен.
 Изходът винаги е 5 реда, стойността винаги е на 4-и ред. Ако командата sqlplus не се изпълни успешно, тя ще върне ненулев exit code.
+
 За всеки от двата акаунта съществува директория, която ще наричаме diag_base. Конкретната директория е:
 • същата като ORACLE_BASE, ако diagnostic_dest няма стойност
 • същата като diagnostic_dest, ако diagnostic_dest има стойност
@@ -39,8 +40,11 @@ oracle@astero:~$
 qux_88231.log).
 • множество rdbms – за потребител oracle, в diag_dir има под-директория rdbms, в която има няколко под-директории, във всяка от които може да има няколко под-директории. Интересни за
 нас са само файловете в тези директории на второ ниво, чието име завършва на подчертавкачисло и имат разширение trc или trm, например corge_27.trc, grault_1024.trm.
-Напишете скрипт, който може да се изпълнява само от някой от тези два акаунта, и приема задължителен първи позиционен аргумент число (в дни). В зависимост от това кой потребител изпълнява
-скрипта, той трябва да извежда на stdout за всяко множество на съответния потребител общият размер (в килобайти) на описаните по-горе интересни файлове за които времето на последната промяна
+
+Напишете скрипт, който може да се изпълнява само от някой от тези два акаунта, и приема задължителен първи позиционен аргумент число (в дни).
+ В зависимост от това кой потребител изпълнява
+скрипта, той трябва да извежда на stdout за всяко множество на съответния потребител общият размер (в килобайти) на 
+описаните по-горе интересни файлове за които времето на последната промяна
 (по съдържание) на файла е по-голямо от зададеното като параметър на скрипта.
 23
 Примерно изпълнение и изход:
@@ -50,3 +54,70 @@ grid@astero:~$ ./foo.sh 73
 crs: 28800
 tnslsnr: 33600
 Забележка: Правилното ползване на временни файлове е разрешено.
+
+ 1 #!/bin/bash
+  2
+  3 [[ "$#" -ne 1 ]] && echo "Invalid cnt args! Must be 1" >&2 && exit 1
+  4 [[ "$1" =~ ^[0-9]+$ ]] && echo "Invalid arg! Must be number" >&2 && exit 2
+  5
+  6 [[ -z "$ORACLE_HOME" ]] && echo "Oracle_Home does not exist!" >&2 && exit 3
+  7 [[ -z "$ORACLE_BASE" ]] && echo "ORACLE_BASE does not exist!" >&2 && exit 4
+  8 [[ -z "$ORACLE_SID" ]] && echo "ORACLE_SID does not exist!" >&2 && exit 5
+  9
+ 10 [[ ! -x "/bin/sqlplus" ]] && echo "sqlplus is not executable" >&2 && exit 6
+ 11
+ 12 [[ ! "$(whoami)" == "oracle" && ! "$(whoami)" == "grid"]] && echo "You are not admin!" >&2 && exit 7
+ 13
+ 14 role=$(
+ 15     if [[ "$(whoami)" == "oracle" ]]; then
+ 16         echo "sysdba"
+ 17     else
+ 18         echo "sysasm"
+ 19     fi
+ 20  )
+ 21
+ 22
+ 23 val=$(sqlplus -SL "/ as $role" @a.sql | tail -n + 4 | head -n -1)
+ 24 [[ $? -ne 0 ]] && echo "Problem in sqlplus! code $?" >&2 && exit 8
+ 25
+ 26 if [[ -z "$val" ]]; then
+ 27     diag_base="$ORACLE_BASE"
+ 28 else
+ 29     diag_base="$val"
+ 30 fi
+ 31
+ 32
+ 33 diag_dir=$(echo "$diag_base/diag")
+ 34
+ 35 if [[ "$(whoami)" -eq "oracle" ]]; then
+ 36     cntK=0
+ 37     while read -r filepath; do
+ 38         filename="${filepath##*/}"
+ 39         [[ "$filename" =~ _[0-9]+.trc$ || "$filename" =~ _[0-9]+.trm$ ]] && ((cntK += $(stat -c %s "$filename")))
+ 40     done < <(find "$diag_dir/rdbms/" -mindepth 2 -maxdepth 2 -type f)
+ 41     echo "rdbms: $cntK"
+ 42 else
+ 43     cntK1=0
+ 44     while read -r filepath; do
+ 45         filename="${filepath##*/}"
+ 46         [[ "$filename" =~ _[0-9]+.trc$ || "$filename" =~ _[0-9]+.trm$ ]] && ((cntK1 += $(stat -c %s "$filename")))
+ 47     done < <(find "$diag_dir/crs/$(hostname -s)/crs/trace" -type f)
+ 48     echo "crs: $cntK1"
+ 49
+ 50     cntK2XML=0
+ 51     while read -r filepath; do
+ 52         filename="${filepath##*/}"
+ 53         [[ "$filename" =~ _[0-9].xml$]] && ((cntK2XML += $(stat -c %s "$filename")))
+ 54     done< <(find "$diag_dir/tnslsnr/$(hostname -s)/" -type d -name alert)
+ 55
+ 56     cntK2LOG=0
+ 57     while read -r filepath; do
+ 58         filename="${filepath##*/}"
+ 59         [[ "$filename" =~ _[0-9].log$]] && ((cntK2LOG += $(stat -c %s "$filename")))
+ 60     done< <(find "$diag_dir/tnslsnr$(hostname -s)/" -type d -name trace)
+ 61
+ 62     cntK2=$((cntK2XML + xntK2LOG))
+ 63     echo "tnslsnr: $cntK2"
+ 64 fi
+ 65
+ 66 exit 0
