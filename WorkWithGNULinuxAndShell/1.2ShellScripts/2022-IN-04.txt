@@ -61,7 +61,7 @@ fuga. Скриптът трябва да:
  28     else #exit_code -eq 0
  29         cat "$filepath" >> temp.txt #b
  30
- 31         currUser=$(echo "$filenameFull" | grep -E '^[a-zA-Z0-9]+\.')
+ 31         currUser="${filenameFull%.cfg}"
  32         isUserThere=0
  33         #c
  34         while IFS=':' read -r username _; do
