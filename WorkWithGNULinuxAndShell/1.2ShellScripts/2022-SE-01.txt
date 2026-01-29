@@ -8,7 +8,6 @@
 Разполагате с два CSV файла със следното примерно съдържание:
 • base.csv:
 unit name,unit symbol,measure
-20
 second,s,time
 metre,m,length
 kilogram,kg,mass
@@ -41,3 +40,38 @@ nano,n,0.000000001
 $ ./foo.sh 2.1 M s
 2100000.0 s (time, second)
 Забележка: За изчисления може да ползвате bc
+
+  1 #!/bin/bash
+  2
+  3 [[ "$#" -ne 3 ]] && echo "Invalid args cnt! Must be 3!" >&2 && exit 1
+  4 [[ ! "$1" =~ ^[0-9]+(\.[0-9]+)?$ ]] && echo "First Argument $1 must be number" >&2 && exit 2
+  5
+  6 [[ ! -e base.csv ]] && echo "base.csv does not exist!" >&2 && exit 3
+  7 [[ ! -r base.csv ]] && echo "base.csv cannot be read!" >&2 && exit 4
+  8
+  9 [[ ! -e prefix.csv ]] && echo "prefix.csv does not exist!" >&2 && exit 5
+ 10 [[ ! -r prefix.csv ]] && echo "prefix.csv cannot be read!" >&2 && exit 6
+ 11
+ 12 n="$1"
+ 13 prefixS="$2"
+ 14 unitS="$3"
+ 15
+ 16 findMeasureAndUnitName=$(
+ 17     while IFS=',' read -r unitName unitSymbol measure; do
+ 18         [[ "$unitSymbol" == "$unitS" ]] && echo "$measure, $unitName" && break
+ 19     done < <(tail -n +2 base.csv)
+ 20 )
+ 21
+ 22
+ 23 findDecimal=$(
+ 24     while IFS=',' read -r _ prefixSymbol decimal; do
+ 25         [[ "$prefixSymbol" == "$prefixS" ]] && echo "$decimal" && break
+ 26     done < <(tail -n +2 prefix.csv)
+ 27 )
+ 28
+ 29 [[ -z "$findDecimal" ]] && echo "Unknown prefix $prefixS" >&2 && exit 7
+ 30
+ 31 res=$(echo "$n * $findDecimal" | bc)
+ 32 echo "$res $unitS ($findMeasureAndUnitName)"
+ 33 exit 0
+~
