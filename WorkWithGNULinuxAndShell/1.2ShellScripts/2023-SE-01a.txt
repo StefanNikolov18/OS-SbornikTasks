@@ -1,0 +1,56 @@
+Зад. 60 2023-SE-01
+Напишете скрипт, който цензурира всички срещания на “забранени” думи в дадени текстове.
+Примерно извикване: ./redact.sh bad_words.lst ./my_texts.
+Първият аргумент на скрипта е име на текстов файл, съдържащ по една забранена дума на ред:
+cake
+cakes
+shake
+banana
+pine_apple42
+shakinator
+Вторият аргумент е име на директория: интересуват ни всички файлове в нея и в нейните поддиректории, чиито имена завършват на .txt.
+Скриптът ви трябва да подмени всички срещания на забранени думи във въпросните файлове с брой
+звездички, съответстващ на дължината на думата. Подменят се само цели срещания на думи.
+Например, ако имаме файл ./my_texts/shake.txt със съдържание:
+to make banana shake, we start by blending four bananas.
+след изпълнение на скрипта, съдържанието му трябва да е:
+to make ****** *****, we start by blending four bananas.
+Под “дума” разбираме последователност от букви, цифри и долни черти.
+За улеснение, може да приемете, че разглеждаме само малки букви (никъде не се срещат главни букви).
+
+
+
+  1 #!/bin/bash
+  2
+  3 [[ "$#" -ne 2 ]] && echo "Invalid args cnt! Must be 2!" >&2 && exit 1
+  4
+  5 [[ ! -e "$1" ]] && echo "$1 is not a file!" >&2 && exit 2
+  6 [[ ! -d "$2" ]] && echo "$2 is not a dir!" >&2 && exit 3
+  7
+  8 bad_words="$1"
+  9 dir="$2"
+ 10
+ 11 while read -r filepath; do
+ 12     touch temp.txt
+ 13     while IFS='|' read -r word; do
+ 14         isBad=0
+ 15         while read -r badWord; do #matching word from bad_words
+ 16             if [[ "$word" == "$badWord" ]]; then
+ 17                 ((isBad++))
+ 18                 break
+ 19             fi
+ 20         done < "$bad_words"
+ 21
+ 22         if [[ "$isBad" -eq 0 ]]; then # bad word
+ 23             size="{#word}"
+ 24             printf '*%.0s' $(seq 1 "$size") >> temp.txt
+ 25         else
+ 26             echo -n  "$word " >> temp.txt
+ 27         fi
+ 28     done < <(tr -s ' ' '|' < "$filepath")
+ 29     cat temp.txt > "$filepath"
+ 30     rm temp.txt
+ 31 done < <(find "$dir" -type f -name "*.txt")
+ 32
+ 33 exit 0
+~
