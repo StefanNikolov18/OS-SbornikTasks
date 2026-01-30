@@ -1,0 +1,87 @@
+Зад. 75 2025-IN-02
+Вашите колеги от съседната лаборатория имат нужда да автоматизират периодичното създаване на
+определен вид конфигурационни файлове на база на съществуващ текстови файл (map.txt) с изисквания.
+ Всеки ред на файла гарантирано се състои от три думи (малки латински букви), разделени с
+whitespace. Примерно съдържание на файла:
+alfa haydn degas
+bravo rossini renoir
+charlie schubert monet
+delta berlioz monet
+echo chopin renoir
+foxtrot liszt monet
+Семантично думите на всеки ред дефинират:
+• име на сървър (hostname) – alfa, bravo, charlie...
+• име на зона (composer) – haydn, rossini, schubert...
+• име на екип (artist) – degas, renoir, monet...
+Общо файлът map.txt описва множество от екипи, като всеки екип съдържа един или повече сървъра;
+а всеки сървър има точно една зона.
+Помогнете на колегите си, като напишете bash скрипт foo.sh, който приема два позиционни параметъра – 
+низ, дефиниращ domain и име на файл с описание.
+Скриптът трябва да извежда на стандартния изход редове, съдържащи релация за всяка зона към
+всеки сървър на съответния екип в указания по-долу формат. Имената на сървърите са допълнени с
+подадения domain и завършват с точка, като редовете с релациите за даден екип се предхождат от ред,
+започващ със знак за коментар (;) с името на екипа.
+Примерно извикване и изход на база горния файл:
+$ foo.sh example.net map.txt
+; team degas
+haydn IN NS alfa.example.net.
+; team monet
+schubert IN NS charlie.example.net.
+schubert IN NS delta.example.net.
+schubert IN NS foxtrot.example.net.
+berlioz IN NS charlie.example.net.
+berlioz IN NS delta.example.net.
+berlioz IN NS foxtrot.example.net.
+liszt IN NS charlie.example.net.
+liszt IN NS delta.example.net.
+liszt IN NS foxtrot.example.net.
+; team renoir
+rossini IN NS bravo.example.net.
+rossini IN NS echo.example.net.
+chopin IN NS bravo.example.net.
+chopin IN NS echo.example.net.
+
+ 1 #!/bin/bash
+  2
+  3 [[ "$#" -ne 2 ]] && echo "Invalid arg cnt! Must be 2" >&2 && exit 1
+  4
+  5 [[ ! -f "$2" ]] && echo "$2 is not a file!" >&2 && exit 2
+  6
+  7 domain="$1"
+  8 map="$2"
+  9
+ 10 group=$(
+ 11     currArt=""
+ 12     currComp=""
+ 13     while read -r hostname composer artist; do
+ 14         if [[ "$currArt" != "$artist" || "$composer" != "$currComp" ]]; then
+ 15             currArt="$artist"
+ 16             currComp="$composer"
+ 17             printf "\n"
+ 18             echo -n "$currArt=$currComp="
+ 19         fi
+ 20
+ 21         echo -n "$hostname "
+ 22
+ 23     done < <(sort -k3,3 -k2,2 "$map")
+ 24 )
+ 25
+ 26 echo "$group"
+ 27 printf "\n"
+ 28
+ 29 currArt=""
+ 30 while IFS="=" read -r artist composer seqHost; do
+ 31     if [[ "$currArt" != "$artist" ]]; then
+ 32         currArt="$artist"
+ 33         echo "; team $currArt"
+ 34     fi
+ 35
+ 36     for host in $seqHost; do
+ 37         echo "$composer IN NS $host.$domain."
+ 38     done
+ 39
+ 40 done < <(echo "$group" | tail -n +2)
+
+
+
+
