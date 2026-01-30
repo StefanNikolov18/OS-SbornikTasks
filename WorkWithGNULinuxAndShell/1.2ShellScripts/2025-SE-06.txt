@@ -20,10 +20,10 @@
   9
  10 [[ ! -d "$target_dir" ]] && mkdir -p "$target_dir"
  11
- 12 find "$dir" -type f ! -path "$target_dir/*" -exec mv {} "$target_dir" \; 2>/dev/null
+ 12 find "$dir" -type f ! -path "$target_dir/*" -exec mv {} "$target_dir" \;
  13
  14 #sha256sum
- 15 while -r read filepath; do
+ 15 while read -r filepath; do
  16     sum=$(sha256sum "$filepath" | cut -d' ' -f1)
  17
  18     filenameFull="${filepath##*/}"
@@ -44,8 +44,8 @@
  33         filenameFull="${filep##*/}"
  34         filename="${filenameFull%%.*}"
  35
- 36         if [[ "$filename" == "$hsum" && ! -L "$filep"]]; then
- 37             ln -s "$filepath" "$filenameFull"
+ 36         if [[ "$filename" == "$hsum" && ! -L "$filep" ]]; then
+ 37             ln -s "$filep" "$filepath"
  39         fi
  40         
  41     done < <(find "$target_dir/" -mindepth 1 -type f)
