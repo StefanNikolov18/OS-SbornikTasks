@@ -1,0 +1,80 @@
+Зад. 78 2025-SE-03
+Създайте скрипт reporter.sh, който приема един или повече пътища (абсолютни или релативни)
+до директории като аргументи. Скриптът трябва да обходи всички обикновени файлове в дадените
+директории и техните поддиректории за да създаде доклад.
+Скриптът очаква съществуването на следните environment променливи:
+• REGISTRY_FILE - път до файл-регистър (ако файлът не съществува, трябва да се създаде)
+• REPORTS_DIR - път до директория, в която се записват докладите (ако тя не съществува, трябва
+да се създаде)
+Файлът-регистър трябва да се състои от редове в следния формат:
+<sha256sum на файл> <абсолютен път до файла>
+Докладът, който се създава от скрипта, трябва да се намира в REPORTS_DIR и да е с име <timestamp>.report,
+където timestamp е текущото време във формат YYYY-MM-DD-HH-MM-SS. Докладите имат следния формат:
+<status 1>:
+<път до намерен файл, за който важи status 1>
+<път до намерен файл, за който важи status 1>
+...
+<status 2>:
+<път до намерен файл, за който важи status 2>
+<път до намерен файл, за който важи status 2>
+...
+...
+reporter.sh трябва да използва файла-регистър, за да създаде доклад. Възможните статуси са следните:
+• new: файлове, които не присъстват в регистъра
+• unchanged: файлове, чиито хеш съвпада с този в регистъра
+• modified: файлове, чиито хеш не съвпада с този в регистъра
+
+
+ 1 #!/bin/bash
+  2
+  3 [[ -z "$REGISTRY_FILE" ]] && echo "REGISTRY_FILE does not exist env val!" >&2 && exit 1
+  4 [[ ! -f "$REGISTRY_FILE" ]] && touch "$REGISTRY_FILE"
+  5
+  6 [[ -z "$REPORTS_DIR" ]] && echo "REPORTS_DIR does not exist env val!" >&2 && exit 2
+  7 [[ ! -d "$REPORTS_DIR" ]] && mkdir -p "$REPORTS_DIR"
+  8
+  9 dateName=$(date +"%Y-%m-%d-%H-%M-%S")
+ 10 touch "$REPORTS_DIR/$dateName.txt"
+ 11
+ 12 reportFile="$REPORTS_DIR/$dateName.txt"
+ 13
+ 14 all=$(
+ 15 for arg in "$@"; do
+ 16
+ 17     while read -r currFile; do
+ 18
+ 19         isThere=0
+ 20         isChanged=0
+ 21         while read -r s256sum file; do              #chete ot registera
+ 22             if [[ "$file" == "$currFile" ]]; then
+ 23                 isThere=1
+ 24                 sum=$(sha256sum "$currFile" | cut -d' ' -f1)
+ 25                 [[ "$sum" != "$s256sum" ]] && isChanged=1
+ 26                 break
+ 27             fi
+ 28         done < "$REGISTRY_FILE"
+ 29
+ 30         if [[ "$isThere" -eq 0 ]]; then
+ 31             echo "new $currFile"
+ 32         elif [[ "$isChanged" -eq 0 ]]; then
+ 33             echo "unchanged $currFile"
+ 34         else
+ 35             echo "modified $currFile"
+ 36         fi
+ 37
+ 38     done< <(find "$arg" -type f)
+ 39
+ 40 done
+ 41 )
+ 42
+ 43 currStat=""
+ 44 while read -r status filepath; do
+ 45     if [[ "$status" != "$currStat" ]]; then
+ 46         currStat="$status"
+ 47         echo "$currStat:" >> "$reportFile"
+ 48     fi
+ 49
+ 50     echo "$filepath" >> "$reportFile"
+ 51
+ 52 done< <(echo "$all" | sort -d' ' -k1)
+
