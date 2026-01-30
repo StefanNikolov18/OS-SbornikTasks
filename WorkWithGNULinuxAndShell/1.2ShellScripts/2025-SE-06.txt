@@ -1,0 +1,57 @@
+Зад. 81 2025-SE-06
+Напишете скрипт flatten.sh, който приема като аргумент име на директория (<DIR>), и:
+• Премества всички обикновени файлове, намиращи се в директорията и нейните поддиректории,
+ в <DIR>/.data. Новите имена на файловете трябва да са sha256 хеш-сумите на техните съдържания.
+– При вече съществуващ файл с правилния хеш в data, скриптът не бива да го презаписва
+(приемаме, че щом името е правилно, то и съдържанието е правилно)
+– .data трябва да бъде създадена, ако не съществува
+• Заменя оригиналните файлове със символни връзки, сочещи към съответния файл в .data
+Уверете се, че скриптът е идемпотентен (може да бъде изпълнен няколко пъти върху една и съща
+директория, без това да създаде проблем и без последващите викания де факто да водят до промяна)
+
+ 1 #!/bin/bash
+  2
+  3 [[ "$#" -ne 1 ]] && echo "Invalid args cnt! Must be 1" >&2 && exit 1
+  4
+  5 [[ ! -d "$1" ]] && echo "$1 is not a directory" >&2 && exit 2
+  6
+  7 dir="$1"
+  8 target_dir="$dir/.data"
+  9
+ 10 [[ ! -d "$target_dir" ]] && mkdir -p "$target_dir"
+ 11
+ 12 find "$dir" -type f ! -path "$target_dir/*" -exec mv {} "$target_dir" \; 2>/dev/null
+ 13
+ 14 #sha256sum
+ 15 while -r read filepath; do
+ 16     sum=$(sha256sum "$filepath" | cut -d' ' -f1)
+ 17
+ 18     filenameFull="${filepath##*/}"
+ 19     filename=$(echo "$filenameFull" | cut -d'.' -f1)
+ 20     
+ 21     [[ "$filename" != "$sum" ]] && razshirenie=$(echo "$filepath" | cut -d'.' -f2-)
+ 22     
+ 23     mv "$filepath" "$(dirname "$filepath")/$sum.$razshirenie"
+ 24
+ 25 done < <(find "$target_dir" -mindepth 1 -type f)
+ 26
+ 27
+ 28 #simvolni vruzki
+ 29 while read -r filepath; do
+ 30     hsum=$(sha256sum "$filepath" | cut -d' ' -f1)
+ 31
+ 32     while read -r filep; do
+ 33         filenameFull="${filep##*/}"
+ 34         filename="${filenameFull%%.*}"
+ 35
+ 36         if [[ "$filename" == "$hsum" && ! -L "$filep"]]; then
+ 37             ln -s "$filepath" "$filenameFull"
+ 39         fi
+ 40         
+ 41     done < <(find "$target_dir/" -mindepth 1 -type f)
+ 42
+ 43
+ 44 done < <(find "$dir" -type f ! -path "$target_dir/*")
+ 45
+ 46 exit 0
+ 47
