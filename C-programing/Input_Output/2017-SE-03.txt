@@ -1,0 +1,122 @@
+Зад. 88 2017-SE-03 Напишете програма на C, която приема три параметъра, имена на двоични файлове.
+Примерно извикване:
+$ ./main patch.bin f1.bin f2.bin
+Файловете f1.bin и f2.bin се третират като двоични файлове, състоящи се от байтове (uint8_t).
+Файлът patch.bin е двоичен файл, състоящ се от наредени тройки от следните елементи (и техните
+типове):
+• отместване uint16_t
+• оригинален байт uint8_t
+• нов байт uint8_t
+Програмата да създава файла f2.bin като копие на файла f1.bin, но с отразени промени на базата
+на файла patch.bin, при следния алгоритъм:
+• за всяка наредена тройка от patch.bin, ако на съответното отместване (в байтове) спрямо началото на файла е записан байта оригинален байт, 
+в изходния файл се записва нов байт. Ако не
+е записан такъв оригинален байт или такова отместване не съществува, програмата да прекратява изпълнението си по подходящ начин;
+• всички останали байтове се копират директно.
+Забележка: Наредените тройки във файла patch.bin да се обработват последователно.
+Примерен f1.bin:
+00000000: f5c4 b159 cc80 e2ef c1c7 c99a 2fb0 0d8c ...Y......../...
+00000010: 3c83 6fed 6b46 09d2 90df cf1e 9a3c 1f05 <.o.kF.......<..
+00000020: 05f9 4c29 fd58 a5f1 cb7b c9d0 b234 2398 ..L).X...{...4#.
+00000030: 35af 6be6 5a71 b23a 0e8d 08de def2 214c 5.k.Zq.:......!L
+Примерен patch.bin:
+00000000: 0200 b159 3000 35af ...Y0.5.
+Примерен f2.bin:
+00000000: f5c4 5959 cc80 e2ef c1c7 c99a 2fb0 0d8c ..YY......../...
+00000010: 3c83 6fed 6b46 09d2 90df cf1e 9a3c 1f05 <.o.kF.......<..
+00000020: 05f9 4c29 fd58 a5f1 cb7b c9d0 b234 2398 ..L).X...{...4#.
+00000030: afaf 6be6 5a71 b23a 0e8d 08de def2 214c ..k.Zq.:......!L
+
+1 #include <stdint.h>
+  2 #include <fcntl.h>
+  3 #include <unistd.h>
+  4 #include <err.h>
+  5
+  6 typedef struct {
+  7     uint16_t offset;
+  8     uint8_t old;
+  9     uint8_t new;
+ 10 } Change;
+ 11
+ 12 int main(int argc, char* argv[]){
+ 13     if(argc != 4){
+ 14         errx(1,"Invalid argument count. Must be 3!");
+ 15     }
+ 16
+ 17     int patch = open(argv[1],O_RDONLY);
+ 18     if (patch == -1){
+ 19         err(2, "Problem opening patch!");
+ 20     }
+ 21
+ 22     int f1 = open(argv[2], O_RDONLY);
+ 23     if (f1 == -1){
+ 24         close(patch);
+ 25         err(2,"Problem opening f1");
+ 26     }
+ 27
+ 28     int f2 = open(argv[3], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+ 29     if (f2 == -1){
+ 30         close(patch); close(f1);
+ 31         err(3,"Problem opening f2");
+ 32     }
+ 33
+ 34     // prenasqm pyrvo f1 -> f2
+ 35     uint8_t a;
+ 36     ssize_t sizeF1;
+ 37     while ((sizeF1 = read(f1,&a,sizeof(uint8_t))) > 0){
+ 38         if(write(f2,&a,sizeof(uint8_t)) == -1){
+ 39             close(patch);close(f1);close(f2);
+ 40             err(10, "problem writing file f2");
+ 41         }
+ 42     }
+ 43     if(sizeF1 == -1){
+ 44         close(patch);close(f1);close(f2);
+ 45         err(11, "problem reading file f1!");
+ 46     }
+ 47
+ 48     lseek(f1,0,SEEK_SET);
+ 49     lseek(f2,0,SEEK_SET);
+ 50
+ 51     Change change;
+ 52     ssize_t sizePatch;
+ 53     while ((sizePatch = read(patch,&change,sizeof(change))) > 0){
+ 54         if (lseek(f1,change.offset,SEEK_SET) == -1){
+ 55             close(patch);close(f1);close(f2);
+ 56             err(4,"lseek not valid f1!");
+ 57         }
+ 58         if(lseek(f2,change.offset,SEEK_SET ) == -1) {
+ 59             close(patch); close(f1); close(f2);
+ 60             err(5,"lseek not valid f2!");
+ 61         }
+ 62
+ 63         uint8_t f1_byte;
+ 64         if(read(f1,&f1_byte,sizeof(uint8_t)) == -1){
+ 65             close(patch);close(f1);close(f2);
+ 66             err(6, "problem reading f1_byte");
+ 67         }
+ 68
+ 69         if(f1_byte != change.old){
+ 70             errx(1,"Bad patch!");
+ 71         }
+ 72
+ 73
+ 74         if(write(f2,&change.new,sizeof(uint8_t)) == -1){
+ 75             close(patch);close(f1);close(f2);
+ 76             err(7,"problem writing new_byte to f2!");
+ 77         }
+ 78
+ 79     }
+ 80
+ 81     if(sizePatch == -1){
+ 82         close(patch);close(f1);close(f2);
+ 83         err(404,"Problem while reading from patch.bin");
+ 84     }
+ 85
+ 86
+ 87     close(patch);close(f1);close(f2);
+ 88
+ 89     return 0;
+ 90 }
+ 91
+
+
