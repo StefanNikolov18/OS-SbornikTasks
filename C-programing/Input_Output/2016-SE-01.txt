@@ -1,0 +1,54 @@
+Зад. 82 2016-SE-01 Напишете програма на C, която приема параметър - име на (двоичен) файл с байтове.
+Програмата трябва да сортира файла.
+
+  1 #include <stdint.h>
+  2 #include <fcntl.h>
+  3 #include <err.h>
+  4 #include <unistd.h>
+  5 #include <stdlib.h>
+  6
+  7 int cmp(const void* a, const void* b){
+  8     const uint8_t* pa = a;
+  9     const uint8_t* pb = b;
+ 10     return (*pa - *pb);
+ 11 }
+ 12
+ 13 int main(int argc, char* argv[]){
+ 14     if (argc != 2){
+ 15         errx(1, "Invalid argument count. Must give 1 argument!");
+ 16     }
+ 17
+ 18     int fd = open(argv[1],O_RDWR);
+ 19     if (fd == -1)
+ 20         err(2, "Cannot open file!");
+ 21
+ 22     off_t size = lseek(fd, 0, SEEK_END);
+ 23     lseek(fd, 0, SEEK_SET);
+ 24
+ 25     uint8_t* buf = malloc(size);
+ 26     if(!buf){
+ 27         close(fd);
+ 28         errx(3 ,"No dynamic memory");
+ 29     }
+ 30
+ 31
+ 32     if(read(fd,buf,size) != size){
+ 33         free(buf);
+ 34         close(fd);
+ 35         err(4,"Problem reading from file!");
+ 36     }
+ 37
+ 38     qsort(buf, size, sizeof(uint8_t),cmp);
+ 39
+ 40     lseek(fd, 0, SEEK_SET);
+ 41    if( write(fd,buf,size) != size) {
+ 42         free(buf);
+ 43         close(fd);
+ 44         err(5,"Problem writing to the file!");
+ 45    }
+ 46
+ 47     free(buf);
+ 48     close(fd);
+ 49     return 0;
+ 50 }
+ 51

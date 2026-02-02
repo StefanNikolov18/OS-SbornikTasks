@@ -9,4 +9,4 @@
 /tmp/baba.blend5
 
 
-> find / -type f -user $(whoami) 2>/dev/null | grep -E '\.blend[0-9]+'
+> find / -type f -user $(whoami) 2>/dev/null | grep -E '\.blend[0-9]+$'

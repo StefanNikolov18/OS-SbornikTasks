@@ -7,4 +7,4 @@
 каквито биха се получили, ако при създаването на файловете ефективната маска е била 0002.
 Гарантирайте, че серията от команди няма изход.
 
-> find /home/$(whoami) -maxdepth 1 -type f -exec chmod 664 {} \; 2>/dev/null
+> find /home/$(whoami) -maxdepth 1 -user $(whoami) -type f -exec chmod 664 {} \; 2>/dev/null
