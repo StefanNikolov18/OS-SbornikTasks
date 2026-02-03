@@ -1,0 +1,106 @@
+Зад. 86 2017-SE-01 Напишете програма на C, която приема три параметъра – имена на двоични файлове.
+Примерно извикване:
+$ ./main f1.bin f2.bin patch.bin
+Файловете f1.bin и f2.bin се третират като двоични файлове, състоящи се от байтове (uint8_t). 
+Файлът f1.bin e “оригиналният” файл, а f2.bin е негово копие, което е било модифицирано по някакъв
+начин (извън обхвата на тази задача). Файлът patch.bin е двоичен файл, състоящ се от наредени
+тройки от следните елементи (и техните типове):
+• отместване (uint16_t) – спрямо началото на f1.bin/f2.bin
+• оригинален байт (uint8_t) – на тази позиция в f1.bin
+• нов байт (uint8_t) – на тази позиция в f2.bin
+Вашата програма да създава файла patch.bin, на базата на съществуващите файлове f1.bin и f2.bin,
+като описва вътре само разликите между двата файла. Ако дадено отместване съществува само в единия 
+от файловете f1.bin/f2.bin, програмата да прекратява изпълнението си по подходящ начин.
+Примерен f1.bin:
+00000000: f5c4 b159 cc80 e2ef c1c7 c99a 2fb0 0d8c ...Y......../...
+00000010: 3c83 6fed 6b46 09d2 90df cf1e 9a3c 1f05 <.o.kF.......<..
+00000020: 05f9 4c29 fd58 a5f1 cb7b c9d0 b234 2398 ..L).X...{...4#.
+00000030: 35af 6be6 5a71 b23a 0e8d 08de def2 214c 5.k.Zq.:......!L
+Примерен f2.bin:
+00000000: f5c4 5959 cc80 e2ef c1c7 c99a 2fb0 0d8c ..YY......../...
+00000010: 3c83 6fed 6b46 09d2 90df cf1e 9a3c 1f05 <.o.kF.......<..
+00000020: 05f9 4c29 fd58 a5f1 cb7b c9d0 b234 2398 ..L).X...{...4#.
+00000030: afaf 6be6 5a71 b23a 0e8d 08de def2 214c ..k.Zq.:......!L
+Примерен patch.bin:
+00000000: 0200 b159 3000 35af ...Y0.5.
+
+ 1 #include <unistd.h>
+  2 #include <err.h>
+  3 #include <stdint.h>
+  4 #include <fcntl.h>
+  5
+  6 typedef struct {
+  7     uint16_t offset;
+  8     uint8_t old;
+  9     uint8_t new;
+ 10 } Entry;
+ 11
+ 12 int main(int argc, char* argv[]){
+ 13     if (argc != 4){
+ 14         errx(1, "Invalid argument count!");
+ 15     }
+ 16
+ 17     int f1 = open(argv[1], O_RDONLY);
+ 18     if (f1 == -1){
+ 19         err(2,"Problem reading %s", argv[1]);
+ 20     }
+ 21
+ 22     int f2 = open(argv[2], O_RDONLY);
+ 23     if (f2 == -1){
+ 24         close(f1);
+ 25         err(3,"Problem reading %s", argv[2]);
+ 26     }
+ 27
+ 28     int patch = open(argv[3], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+ 29     if (patch == -1){
+ 30         close(f1); close(f2);
+ 31         err(4, "Problem creating %s", argv[3]);
+ 32     }
+ 33
+ 34     off_t sF1 = lseek(f1,0,SEEK_END);
+ 35     off_t sF2 = lseek(f2,0,SEEK_END);
+ 36
+ 37     if(sF1 != sF2){
+ 38         close(f1);close(f2);close(patch);
+ 39         errx(5,"Files are not the same size!");
+ 40     }
+ 41
+ 42     lseek(f1,0,SEEK_SET);
+ 43     lseek(f2,0,SEEK_SET);
+ 44
+ 45     uint8_t f1_byte, f2_byte;
+ 46     ssize_t sizeF1;
+ 47     while ((sizeF1 = read(f1,&f1_byte,sizeof(uint8_t))) > 0){
+ 48         if(read(f2,&f2_byte,sizeof(uint8_t)) != sizeof(uint8_t)){
+ 49             close(f1); close(f2);close(patch);
+ 50             err(6, "Problem reading from %s", argv[2]);
+ 51         }
+ 52
+ 53         if (f1_byte != f2_byte){
+ 54             Entry entry;
+ 55
+ 56             entry.offset = (uint16_t)(lseek(f1, 0, SEEK_CUR) - 1);
+ 57             entry.old = f1_byte;
+ 58             entry.new = f2_byte;
+ 59
+ 60             if(write(patch,&entry,sizeof(entry)) != sizeof(entry)){
+ 61                 close(f1);close(f2);close(patch);
+ 62                 err(7,"Problem writing to file %s", argv[3]);
+ 63             }
+ 64
+ 65         }
+ 66     }
+ 67
+ 68     if(sizeF1 == -1){
+ 69         close(f1);close(f2);close(patch);
+ 70         err(8,"Problem reading from %s",argv[1]);
+ 71     }
+ 72
+ 73
+ 74     close(f1);
+ 75     close(f2);
+ 76     close(patch);
+ 77
+ 78     return 0;
+ 79 }
+
