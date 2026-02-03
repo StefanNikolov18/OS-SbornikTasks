@@ -1,0 +1,124 @@
+Зад. 104 2023-SE-01
+Имате файл, съдържащ откъс от поток от съобщения, който може би е повреден на места.
+Трябва да напишете програма, която по даден такъв файл, генерира нов файл, съдържащ точно всички
+последователности от байтове от оригиналния, които са валидни съобщения.
+Примерно извикване на програмата: ./main stream.bin messages.bin, където stream.bin е име на
+съществуващ файл, а messages.bin трябва да се създаде (или презапише).
+Валидно съобщение с дължина 𝑁 байта има вида:
+• байт 1 — 0x55 – указва начало на съобщение
+• байт 2 — числото 𝑁 – представено като 8-битово число без знак
+• байтове от 3 до (𝑁 − 1) — произволни данни (съдържанието на съобщението)
+• байт N — checksum на байтове от 1 до (𝑁 − 1)
+Checksum на поредица от байтове е резултатът от прилагане операцията “побитово изключващо или“
+
+ 1 #include <unistd.h>
+  2 #include <fcntl.h>
+  3 #include <stdint.h>
+  4 #include <err.h>
+  5 #include <stdlib.h>
+  6
+  7 int main(int argc, char* argv[]){
+  8     if(argc != 3){
+  9         errx(1,"Invalid argument count!");
+ 10     }
+ 11
+ 12     int stream = open(argv[1],O_RDONLY);
+ 13     if (stream == -1){
+ 14         err(2, "Cannot open file %s", argv[1]);
+ 15     }
+ 16
+ 17     int messages = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+ 18     if (messages == -1){
+ 19         close(stream);
+ 20         err(3, "Cannot open file %s", argv[2]);
+ 21     }
+ 22
+ 23     uint8_t byte;
+ 24     ssize_t streamSize;
+ 25     while ((streamSize = read(stream, &byte,sizeof(uint8_t))) > 0) {
+ 26
+ 27         if( byte == 0x55){
+ 28             off_t pos = lseek(stream, 0, SEEK_CUR); //save pos after 0x55
+ 29             uint8_t n;
+ 30             ssize_t r = read(stream,&n, sizeof(uint8_t));
+ 31             if (r == 0){ break; }
+ 32
+ 33             if (r == -1){
+ 34                 close(stream); close(messages);
+ 35                 err(4, "Cannot read the N byte");
+ 36             }
+ 37
+ 38             //check n
+ 39             if (n < 3){
+ 40                 continue;
+ 41             }
+ 42
+ 43
+ 44             //creating array for n-3-1 + 1 = n - 3
+ 45             ssize_t size_b = n - 3;
+ 46             uint8_t* buff = malloc(size_b);
+ 47             if (!buff){
+ 48                 close(stream);close(messages);
+ 49                 err(5, "No dynamic memory to allocate!");
+ 50             }
+ 51
+ 52             for(int i = 0; i < size_b; ++i){
+ 53                 ssize_t b = read(stream, &buff[i],sizeof(uint8_t));
+ 54                 if (b == 0) {
+ 55                     free(buff);
+ 56                     break;
+ 57                 }
+ 58                 if (b == -1){
+ 59                     free(buff);
+ 60                     close(stream); close(messages);
+ 61                     err(6, "Problem while reading for buffer!");
+ 62                 }
+ 63             }
+ 64
+ 65             uint8_t checkSum;
+ 66             ssize_t c = read(stream, &checkSum, sizeof(uint8_t));
+ 67             if (c == 0) {
+ 68                 free(buff);
+ 69                 break;
+ 70             }
+ 71             if (c == -1){
+ 72                 free(buff);
+ 73                 close(stream); close(messages);
+ 74                 err(7, "Problem while reading checksum!");
+ 75             }
+ 76
+ 77             // sum of all from buffer
+ 78             uint8_t sumXOR = byte^n;
+ 79             for(int i = 0; i < size_b;++i){
+ 80                 sumXOR ^= buff[i];
+ 81             }
+ 82
+ 83             if(sumXOR == checkSum){
+ 84                 for(int i = 0; i < size_b; ++i){
+ 85                     if(write(messages,&buff[i],sizeof(uint8_t)) == -1){
+ 86                         free(buff);
+ 87                         close(stream);close(messages);
+ 88                         err(8, "Problem writing to messages!");
+ 89                     }
+ 90                 }
+ 91             }
+ 92             else { //invalid sum
+ 93                 lseek(stream, pos, SEEK_SET);
+ 94             }
+ 95
+ 96             //free buffer
+ 97             free(buff);
+ 98         }
+ 99
+100     }
+101     if (streamSize == -1){
+102         close(stream);close(messages);
+103         err(9, "Problem while reading form stream!");
+104     }
+105
+106
+107     close(stream);
+108     close(messages);
+109
+110     return 0;
+111 }
