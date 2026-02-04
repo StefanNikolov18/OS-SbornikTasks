@@ -1,0 +1,108 @@
+Зад. 113 2017-IN-01 Напишете програма на C, която използвайки външни shell команди 
+през pipe() да извежда статистика за броя на използване на различните shell-ове от потребителите,
+ дефинирани в системата. Изходът да бъде сортиран във възходящ ред според брой използвания на shell-овете.
+Примерно извикване и изход:
+$ ./main
+1 /bin/sync
+3 /bin/bash
+7 /bin/false
+17 /usr/sbin/nologin
+
+ 1 #include <unistd.h>
+  2 #include <fcntl.h>
+  3 #include <err.h>
+  4 #include <sys/wait.h>
+  5
+  6
+  7 int main(void){
+  8
+  9     int pipe_1[2];
+ 10     int pipe_2[2];
+ 11     int pipe_3[2];
+ 12
+ 13     if(pipe(pipe_1) == -1){
+ 14         err(1, "pipe_1");
+ 15     }
+ 16     if(pipe(pipe_2) == -1){
+ 17         close(pipe_1[0]);
+ 18         close(pipe_1[1]);
+ 19         err(2, "pipe_2");
+ 20     }
+ 21     if(pipe(pipe_3) == -1){
+ 22         close(pipe_1[0]);close(pipe_1[1]);
+ 23         close(pipe_2[0]);close(pipe_2[1]);
+ 24         err(3, "pipe_3");
+ 25     }
+ 26
+ 27     int pid1 = fork();
+ 28
+ 29     if(pid1 == -1){
+ 30         err(4, "fork!");
+ 31     }
+ 32
+ 33     //cut -d -f7 /etc/passwd
+ 34     if(pid1 == 0){
+ 35         //child1
+ 36         dup2(pipe_1[1],1);
+ 37
+ 38         close(pipe_1[0]);close(pipe_1[1]);
+ 39         close(pipe_2[0]);close(pipe_2[1]);
+ 40         close(pipe_3[0]);close(pipe_3[1]);
+ 41
+ 42         execlp("cut", "cut", "-d:","-f7","/etc/passwd", (char*) NULL);
+ 43         err(5, "execlp cut!");
+ 44     }
+ 45
+ 46     int pid2 = fork();
+ 47     if(pid2 == -1){
+ 48         err(6, "fork2");
+ 49     }
+ 50
+ 51     //sort
+ 52     if(pid2 == 0){
+ 53         //child2
+ 54         dup2(pipe_1[0],0);
+ 55         dup2(pipe_2[1], 1);
+ 56
+ 57         close(pipe_1[0]);close(pipe_1[1]);
+ 58         close(pipe_2[0]);close(pipe_2[1]);
+ 59         close(pipe_3[0]);close(pipe_3[1]);
+ 60
+ 61         execlp("sort", "sort", (char*) NULL);
+ 62         err(7, "execlp sort");
+ 63     }
+ 64
+ 65     // uniq -c
+66     int pid3 = fork();
+ 67     if(pid3 == -1){
+ 68         err(8,"fork3");
+ 69     }
+ 70
+ 71     if(pid3 == 0){
+ 72         //child 3
+ 73         dup2(pipe_2[0],0);
+ 74         dup2(pipe_3[1],1);
+ 75
+ 76
+ 77         close(pipe_1[0]);close(pipe_1[1]);
+ 78         close(pipe_2[0]);close(pipe_2[1]);
+ 79         close(pipe_3[0]);close(pipe_3[1]);
+ 80
+ 81         execlp("uniq", "uniq", "-c", (char*)NULL);
+ 82         err(9, "execlp uniq");
+ 83     }
+ 84
+ 85
+ 86     //parent
+ 87     dup2(pipe_3[0],0);
+ 88
+ 89     close(pipe_1[0]);close(pipe_1[1]);
+ 90     close(pipe_2[0]);close(pipe_2[1]);
+ 91     close(pipe_3[0]);close(pipe_3[1]);
+ 92
+ 93
+ 94     execlp("sort", "sort", "-n", (char*)NULL);
+ 95     err(10, "execlp sort -n");
+ 96
+ 97     return 0;
+ 98 }
