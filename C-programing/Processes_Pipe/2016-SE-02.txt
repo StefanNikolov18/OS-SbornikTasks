@@ -1,0 +1,45 @@
+Зад. 112 2016-SE-02 Напишете програма на C, която реализира simple command prompt. Тя изпълнява в цикъл
+следната поредица действия:
+1. Извежда промпт на стандартния изход.
+2. Прочита име на команда.
+3. Изпълнява без параметри прочетената команда.
+Командите се търсят в директорията /bin. За край на програмата се смята въвеждането на exit.
+
+ 1 #include <unistd.h>
+  2 #include <err.h>
+  3 #include <fcntl.h>
+  4 #include <string.h>
+  5 #include <stdbool.h>
+  6
+  7 int main(void){
+  8
+  9     char buffer[1024];
+ 10     while(true){
+ 11         ssize_t size = read(0,&buffer,sizeof(buffer));
+ 12         if(size == -1){
+ 13             err(1,"read command!");
+ 14         }
+ 15         buffer[size - 1] = '\0';
+ 16
+ 17         if(strcmp(buffer,"exit") == 0){
+ 18             break;
+ 19         }
+ 20
+ 21         int pid = fork();
+ 22         if (pid == -1){
+ 23             err(2, "fork");
+ 24         }
+ 25
+ 26         if( pid == 0){
+ 27             //child
+ 28             char path[1030] = "/bin/";
+ 29             strcat(path, buffer);
+ 30
+ 31             execl(path, path, (char*) NULL);
+ 32             err(3, "execlp!");
+ 33         }
+ 34         wait(NULL);
+ 35     }
+ 36     return 0;
+ 37 }
+
