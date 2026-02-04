@@ -1,0 +1,43 @@
+Зад. 111 2016-SE-01 Напишете програма на C,
+ която по подадено име на (текстови) файл като параметър,
+  извежда съдържанието на файла сортирано, 
+  чрез употреба на външните програми cat и sort през pipe().
+
+1 #include <unistd.h>
+  2 #include <fcntl.h>
+  3 #include <err.h>
+  4
+  5 int main(int argc, char* argv[]){
+  6     if (argc != 2){
+  7         errx(1, "Invalid argument count! Must be one!");
+  8     }
+  9
+ 10     int pipe_fd[2];
+ 11     if( pipe(pipe_fd) == -1){
+ 12         err(2, "pipe");
+ 13     }
+ 14
+ 15     int pid = fork();
+ 16     if (pid == -1){
+ 17         err(3, "fork");
+ 18     }
+ 19
+ 20     if (pid == 0){
+ 21         //child
+ 22         close(pipe_fd[0]);
+ 23         dup2(pipe_fd[1],1);
+ 24         close(pipe_fd[1]);
+ 25
+ 26         execlp("cat", "cat", argv[1],(char*) NULL);
+ 27         err(4, "execlp cat!");
+ 28     }
+ 29     //parent
+ 30     close(pipe_fd[1]);
+ 31     dup2(pipe_fd[0], 0);
+ 32     close(pipe_fd[0]);
+ 33
+ 34     execlp("sort", "sort", (char*) NULL);
+ 35     err(5,"execlp sort!");
+ 36
+ 37     return 0;
+ 38 }
