@@ -1,0 +1,84 @@
+Зад. 118 2020-SE-02 При изграждане на система за пренасяне на сериен асинхронен сигнал върху радиопреносна мрежа се оказало, 
+че големи поредици от битове само нули или само единици смущават сигнала, поради нестабилно ниво. Инженерите решили проблема, като:
+• в моментите, в които няма сигнал от серийният порт, вкарвали изкуствено байт 0x55 в потока;
+• реалните байтове 0x00, 0xFF, 0x55 и 0x7D се кодирали посредством XOR-ване (побитова обработка с изключващо-или) с 0x20,
+ като полученият байт се изпращал през потока, предхождан от
+0x7D, който играе ролята на escape character.
+Разполагате със запис от такъв поток. Напишете програма на C, която приема два параметъра - имена
+на файлове. Примерно извикване:
+$ ./main input.lfld output.bin
+Програмата трябва да обработва записа и да генерира output.bin, който да съдържа оригиналните
+данни. Четенето на входните данни трябва да става посредством изпълнение на външна shell команда.
+
+ 1 #include <unistd.h>
+  2 #include <fcntl.h>
+  3 #include <err.h>
+  4 #include <stdint.h>
+  5
+  6 int main(int argc, char* argv[]){
+  7     if (argc != 3){
+  8         errx(1, "Invalid arg count. Must be 2!");
+  9     }
+ 10
+ 11     int p[2];
+ 12     if(pipe(p) == -1){
+ 13         err(2, "pipe");
+ 14     }
+ 15
+ 16     int pid = fork();
+ 17     if(pid == -1){
+ 18         close(p[0]);
+ 19         close(p[1]);
+ 20         err(3, "fork");
+ 21     }
+ 22
+ 23     if(pid == 0){
+ 24         //child
+ 25         dup2(p[1],1);
+ 26         close(p[0]);close(p[1]);
+ 27
+ 28         execlp("cat", "cat", argv[1],(char*)NULL);
+ 29         err(4,"execlp");
+ 30     }
+ 31
+ 32     //parent
+ 33     dup2(p[0],0);  //blocking operation no need for wait()
+ 34     close(p[0]);close(p[1]);
+ 35
+ 36     int output = open(argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+ 37     if(output == -1){
+ 38         err(5,"err opening %s",argv[2]);
+ 39     }
+ 40
+ 41     uint8_t byte;
+ 42     ssize_t size;
+ 43     while((size = read(0,&byte,sizeof(uint8_t))) > 0){
+ 44         if(byte == 0x7D){
+ 45             if(read(0,&byte,sizeof(uint8_t)) == -1){
+ 46                 close(output);
+ 47                 err(6,"reading from 0");
+ 48             }
+ 49             uint8_t res = byte^0x20;
+ 50             if(write(output, &res, sizeof(uint8_t)) == -1){
+ 51                 close(output);
+ 52                 err(7,"writing to output failed");
+ 53             }
+ 54         } else if( byte == 0x55){
+ 55
+ 56         }else{
+ 57             if(write(output,&byte,sizeof(uint8_t)) == -1){
+ 58                 close(output);
+ 59                 err(8,"writing to output failed");
+ 60             }
+ 61
+ 62         }
+ 63
+ 64     }
+ 65     if(size == -1){
+ 66         close(output);
+ 67         err(9,"reading from 0");
+ 68     }
+ 69
+ 70     close(output);
+ 71     return 0;
+ 72 }
