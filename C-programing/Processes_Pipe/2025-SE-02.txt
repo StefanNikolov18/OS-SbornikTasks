@@ -1,0 +1,81 @@
+Зад. 129 2025-SE-02
+Напишете програма на C, която приема пакети от стандартния изход на един процес (ще го наричаме
+производител), и записва всеки пакет в един от няколко файлове (ще ги наричаме консуматори).
+Програмата трябва да се изпълнява успешно само ако консуматорите вече съществуват, и да добавя
+новите пакети към края им без да модифицира текущото им съдържание.
+Програмата се извиква по следния примерен начин:
+./main ./example/client /tmp/p1 /tmp/p2 /tmp/p3
+Първият аргумент е програмата производител, която е дадена наготово и трябва да бъде стартирана
+от вашата програма.
+Производителят записва последователност от 64-байтови пакети (тяхното съдържание не ни интересува) на стандартния изход. Вашата програма трябва да записва всеки пакет в някой от файловете,
+подадени като следващи аргументи, на round-robin принцип – при по-горния пример, последователността изглежда така:
+• Пакет 1 отива в /tmp/p1
+• Пакет 2 отива в /tmp/p2
+• Пакет 3 отива в /tmp/p3
+• Пакет 4 отива в /tmp/p1
+• ...
+Подадените файлове могат да са най-много 16 на брой. Програмата приключва, когато производителят завърши.
+
+ 1 #include <unistd.h>
+  2 #include <err.h>
+  3 #include <stdint.h>
+  4 #include <stdbool.h>
+  5 #include <fcntl.h>
+  6
+  7 int main(int argc, char* argv[]){
+  8     if(argc < 3 || argc > 18){
+  9         errx(1,"Invalid argument count!");
+ 10     }
+ 11
+ 12     const char* client = argv[1];
+ 13
+ 14     int pipe_fd[2];
+ 15     if(pipe(pipe_fd) == -1){
+ 16         err(2, "pipe");
+ 17     }
+ 18
+ 19     int pid = fork();
+ 20     if(pid == -1){
+ 21         close(pipe_fd[0]); close(pipe_fd[1]);
+ 22         err(3,"fork");
+ 23     }
+ 24
+ 25     //client execute
+ 26     if(pid == 0){
+ 27         //child
+ 28         dup2(pipe_fd[1],1);
+ 29         close(pipe_fd[1]);
+ 30         close(pipe_fd[0]);
+ 31
+ 32         execlp(client, client, (char*) NULL);
+ 33         err(4, "execlp");
+ 34     }
+ 35
+ 36     //parent -> priema paketi i go preprasha
+ 37     dup2(pipe_fd[0],0);
+ 38     close(pipe_fd[0]); close(pipe_fd[1]);
+ 39
+ 40     uint8_t packet[64];
+ 41     int index = 0;
+ 42     ssize_t sizePacket = 0;
+ 43     while((sizePacket = read(0,&packet,sizeof(uint8_t)*64)) > 0){
+ 44         int fd = open(argv[2 + (index % (argc - 2 ))],O_WRONLY | O_APPEND);
+ 45         index++;
+ 46         if(fd == -1){
+ 47             err(6,"opening fd");
+ 48         }
+ 49         if(write(fd,&packet,sizeof(uint8_t)*64) != (ssize_t)(sizeof(uint8_t)*64)){
+ 50             close(fd);
+ 51             err(7,"Problem writing to fd");
+ 52
+ 53         }
+ 54
+ 55         close(fd);
+ 56
+ 57     }
+ 58     if(sizePacket == -1){
+ 59         err(5,"Problem reading packets!");
+ 60     }
+ 61     //sizePacket == 0
+ 62     return 0;
+ 63 }
