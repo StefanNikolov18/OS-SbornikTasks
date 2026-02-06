@@ -1,0 +1,135 @@
+Зад. 119 2020-SE-03 Напишете програма на C, която приема един задължителен позиционен параметър -
+име на файл. Файлът се състои от не повече от 8 наредени тройки елементи:
+• име на файл – точно 8 байта, последният от които задължително е 0x00. Ако името е по-късо от
+7 знака, излишните байтове са 0x00;
+• offset – uint32_t, който дава пореден номер на елемент (спрямо 𝑁0) във файла;
+• length – uint32_t, който дава брой елементи.
+За всяка наредена тройка програмата трябва да пусне child процес, който да XOR-не (обработи с изключващоили) 
+елементите (uint16_t) от съответния файл един със друг, и да върне резултата на parent процеса,
+който от своя страна трябва да XOR-не всички получените резултати и да изведе полученото число в
+следния формат:
+result: 573B
+Забележка: С пълен брой точки се оценяват решения, в които child процесите работят паралелно
+
+#include <unistd.h>
+#include <err.h>
+#include <stdint.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct{
+    uint32_t offset;
+    uint32_t length;
+} Entry;
+
+int main(int argc,char* argv[]){
+    if(argc != 2){
+        errx(1,"Invalid argument count!");
+    }
+
+    int fd1 = open(argv[1],O_RDONLY);
+    if(fd1 == -1){
+        err(2,"Cannot open %s",argv[1]);
+    }
+
+    int p[2];
+    if(pipe(p) == -1){
+        close(fd1);
+        err(5,"pipe");
+    }
+
+    ssize_t sizeF;
+    char filename[8];
+
+    // Брой на child процесите
+    int child_count = 0;
+
+    while((sizeF = read(fd1,&filename,sizeof(filename))) > 0){
+       if(sizeF != 8){
+            err(3,"Not 8 bytes!");
+       }
+
+        Entry entry;
+        if(read(fd1,&entry,sizeof(entry)) != sizeof(entry)){
+            close(fd1);
+            close(p[0]);close(p[1]);
+            err(4,"Error reading entry!");
+        }
+
+        int pid = fork();
+        if(pid == -1){
+            close(fd1);
+            close(p[0]);close(p[1]);
+            err(5,"fork");
+        }
+
+        if(pid == 0){
+            // child
+            close(p[0]); // не използва четене от pipe
+
+            char fname[9];
+            memcpy(fname, filename, 8);
+            fname[8] = '\0';
+
+            int file = open(fname, O_RDONLY);
+            if(file == -1){
+                close(p[1]);
+                err(6,"Opening file");
+            }
+
+            lseek(file, entry.offset * sizeof(uint16_t), SEEK_SET);
+
+            uint16_t a, sum = 0;
+            ssize_t s;
+            while(entry.length > 0 && (s = read(file, &a, sizeof(uint16_t))) == sizeof(uint16_t)){
+                sum ^= a;
+                entry.length--;
+            }
+            if(s == -1){
+                close(file);
+                close(p[1]);
+                err(7,"reading file");
+            }
+
+            close(file);
+
+            if(write(p[1], &sum, sizeof(sum)) == -1){
+                close(p[1]);
+                err(8,"writing to pipe");
+            }
+            close(p[1]);
+            exit(0);
+        }
+
+        child_count++;
+    }
+
+    if(sizeF == -1){
+        close(p[0]); close(p[1]); close(fd1);
+        err(9,"reading from %s",argv[1]);
+    }
+
+    close(fd1);
+    close(p[1]); // parent не пише
+
+    // Parent чете резултатите от децата
+    uint16_t S = 0, tmp;
+    for(int i = 0; i < child_count; i++){
+        if(read(p[0], &tmp, sizeof(tmp)) != sizeof(tmp)){
+            close(p[0]);
+            err(10,"Reading from pipe failed");
+        }
+        S ^= tmp;
+    }
+    close(p[0]);
+
+    // Изчакваме всички деца
+    while(wait(NULL) > 0);
+
+    printf("result: %X\n", S);
+
+    return 0;
+}
